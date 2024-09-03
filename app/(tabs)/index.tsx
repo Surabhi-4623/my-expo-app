@@ -8,6 +8,10 @@ import { useEffect, useState } from 'react';
 export default function Home() {
   const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();
   const [localAssets, setLocalAssets]=useState<MediaLibrary.Asset[]>([]);
+  const [hasNextPage, setHasNextPage] = useState(true);
+  const [endCursor, setEndCursor] = useState<string>();
+  const [loading, setLoading] =useState(false);
+
   useEffect(()=>{
     if(permissionResponse?.status !== 'granted'){
       requestPermission();
@@ -19,13 +23,23 @@ export default function Home() {
     if(permissionResponse?.status === 'granted'){
       loadLocalAssets();
     }
-  },[permissionResponse])
+  },[permissionResponse]);
 
   const loadLocalAssets = async() =>{
-    const assetPage= await MediaLibrary.getAssetsAsync();
-    console.log(JSON.stringify(assetPage,null,2));
+    if(loading || !hasNextPage){
+      return;
+    }
+    setLoading(true);
+    console.log('Loading');
+    const assetPage= await MediaLibrary.getAssetsAsync({after : endCursor});
+    //console.log(JSON.stringify(assetPage,null,2));
 
-    setLocalAssets(assetPage.assets)
+    setLocalAssets((existingItems) =>[ ...existingItems, ...assetPage.assets]);
+    
+    setHasNextPage(assetPage.hasNextPage);
+    setEndCursor(assetPage.endCursor);
+    setLoading(false);
+
   };
 
   console.log(permissionResponse);
@@ -39,8 +53,12 @@ export default function Home() {
       //  contentContainerStyle={{gap:2}}
       contentContainerClassName="gap-[2px]"
       columnWrapperClassName='gap-[2px]'
+      onEndReached={loadLocalAssets}
+      onEndReachedThreshold={1}
+      refreshing={loading}
        renderItem={({item}) => <Image source={{uri : item.uri}} style={{width:'25%', aspectRatio:1}}/> }
       />
+   
     </>
   );
 }
